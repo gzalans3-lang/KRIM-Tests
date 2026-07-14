@@ -79,22 +79,22 @@ questions = [
     }
 ]
 
+# Inicializējam sesijas mainīgos
 if 'current_q' not in st.session_state:
     st.session_state.current_q = 0
     st.session_state.score = 0
     st.session_state.finished = False
-    st.session_state.start_time = time.time()
+    st.session_state.time_left = 50
 
-def next_question(selected_option):
-    # 50 sekunžu laika limits jautājumam
-    time_spent = time.time() - st.session_state.start_time
-    if time_spent <= 50:
+def trigger_next_question(selected_option=None):
+    """Pārslēdz uz nākamo jautājumu un atiestata laiku"""
+    if selected_option is not None:
         if selected_option == questions[st.session_state.current_q]["answer"]:
             st.session_state.score += 1
             
     if st.session_state.current_q < len(questions) - 1:
         st.session_state.current_q += 1
-        st.session_state.start_time = time.time()
+        st.session_state.time_left = 50
     else:
         st.session_state.finished = True
 
@@ -107,7 +107,7 @@ if st.session_state.finished:
         st.session_state.current_q = 0
         st.session_state.score = 0
         st.session_state.finished = False
-        st.session_state.start_time = time.time()
+        st.session_state.time_left = 50
         st.rerun()
 else:
     q_data = questions[st.session_state.current_q]
@@ -115,15 +115,26 @@ else:
     
     st.progress((st.session_state.current_q) / len(questions))
     
-    time_left = 50 - int(time.time() - st.session_state.start_time)
-    if time_left > 0:
-        st.info(f"⏳ Atlicis laiks: {time_left} sekundes")
-    else:
-        st.error("⏳ Laiks iztecējis! Izvēlieties atbildi, lai turpinātu (tā netiks ieskaitīta).")
-        
+    # Izveidojam dinamisku vietu laika atskaitei, lai tā vizuāli tikšķētu
+    timer_placeholder = st.empty()
+    
+    # Atbilžu pogu izkārtojums (tiek parādīts pirms laika cikla sākuma)
     for i, option in enumerate(q_data["options"]):
         if st.button(option, key=f"btn_{st.session_state.current_q}_{i}"):
-            next_question(i)
+            trigger_next_question(i)
             st.rerun()
 
-st.caption("Anonīms tests, dati netiek saglabāti vai apstrādāti saskaņā ar VDAR/GDPR principiem.")
+    st.write("") # Atstarpe vizuālajam izskatam
+    st.caption("Anonīms tests, dati netiek saglabāti vai apstrādāti saskaņā ar VDAR/GDPR principiem.")
+
+    # Aktīvais laika atskaites cikls (katru sekundi pārzīmē tikai laika logu)
+    while st.session_state.time_left > 0:
+        timer_placeholder.info(f"⏳ Atlicis laiks: {st.session_state.time_left} sekundes")
+        time.sleep(1)
+        st.session_state.time_left -= 1
+        st.rerun()
+
+    # Ja laiks ir 0 un lietotājs nav nospiedis nevienu pogu
+    if st.session_state.time_left == 0:
+        trigger_next_question(selected_option=None)
+        st.rerun()
